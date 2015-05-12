@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<head>
+    <style>
+
+        body{
+            font-family:chaparral-pro;
+            /*padding:0;*/
+            /*margin:0;*/
+        }
+        .axis {
+            font: 10px sans-serif;
+        }
+
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #000;
+            shape-rendering: crispEdges;
+        }
+        g .tick{
+            opacity: 0 !important;
+        }
+
+        .bookbar {
+            fill: #aaa;
+            transition: fill .5s;
+        }
+        #quotecontainer{
+
+            text-align:center;
+
+        }
+        #quote{
+            margin:auto;
+            max-width:600px;
+            text-align:left;
+            font-size:18px;
+            line-height:24px;
+            padding-bottom:10px;
+        }
+        #quotetitle{
+            max-width:600px;
+            margin:auto;
+            text-align:left;
+            font-style:italic;
+        }
+        #quoteauthor{
+            max-width:600px;
+            margin:auto;
+            text-align:left;
+            font-style:italic;
+
+        }
+        #quoteOutOf{
+            max-width:600px;
+            margin:auto;
+            text-align:left;
+            font-style:italic;
+        }
+
+
+    </style>
+    <script src="d3/d3.js" charset="utf-8"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <script src="//use.typekit.net/ksj5eqh.js"></script>
+    <script>try{Typekit.load();}catch(e){}</script>
+</head>
+
+<body>
+
+
+
+<script>
+
+    var data;
+    var curBook = 0;
+    var curQuote = 0;
+
+    var maxHighlights = 155;
+
+    var margin = {top: 20, right: 0, bottom: 20, left: 0},
+            width = 800 - margin.left - margin.right,
+            height = 500 - margin.top - margin.bottom;
+
+    // Parse the date / time
+    var parseDate = d3.time.format("%Y-%m").parse;
+
+    var x = d3.scale.ordinal().rangeRoundBands([0, width], .05);
+
+    var y = d3.scale.linear()
+//            .domain([0, d3.max(data)])
+            .range([height, 0]);
+
+    var xAxis = d3.svg.axis()
+            .scale(x)
+            .orient("bottom");
+    //            .tickFormat(d3.time.format("%Y-%m"));
+
+
+    var yAxis = d3.svg.axis()
+            .scale(y)
+            .orient("left")
+            .ticks(10);
+
+    var svg = d3.select("body").append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
+
+    var drag = d3.behavior.drag()
+//            .origin(function(d) { return d; })
+            .on("dragstart", dragstarted)
+            .on("drag", dragged)
+            .on("dragend", dragended);
+
+    function dragstarted(d) {
+        d3.event.sourceEvent.stopPropagation();
+        d3.select(this).classed("dragging", true);
+        console.log("dragstarted");
+    }
+
+    function dragged(d) {
+        console.log(d3.event);
+        d3.select(this).attr("cx", d.x = d3.event.x).attr("cy", d.y = d3.event.y);
+        console.log("dragged: " + d3.event.y);
+        var bottom = (height) - d3.event.y;
+        var targetQuote = Math.ceil(bottom / (height / maxHighlights));
+        console.log(targetQuote);
+        drag_select(targetQuote);
+    }
+
+    function dragended(d) {
+        d3.select(this).classed("dragging", false);
+        console.log("dragended");
+    }
+
+    d3.json("highlights.json", function (error, json) {
+        if (error) return console.warn(error);
+        data = json.titles;
+
+
+
+        data.reverse();
+
+        for (var i = 0; i < data.length; i++) {
+            if (data[i].numHighlights > maxHighlights) {
+//                console.log(data[i]);
+//                console.log(data[i].numHighlights);
+                maxHighlights = data[i].numHighlights;
+            }
+        }
+
+        console.log(data);
+
+
+        visualizeit();
+    });
+
+    function visualizeit() {
+        console.log(data);
+
+
+
+
+        data.forEach(function (d, i) {
+//            console.log(i);
+            d.index = +i;
+//            d.value =  +Math.ceil(Math.log2(d.numHighlights)) + 1;
+            d.value = d.numHighlights;
+            d.name = d.title;
+        });
+
+        x.domain(data.map(function (d) {
+            return d.title;
+        }));
+        y.domain([0, 155]);
+
+
+        svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(" + 0 + "," + height + ")")
+                .call(xAxis)
+                .selectAll("text")
+                .style("text-anchor", "start")
+                .attr("dx", ".8em")
+                .attr("dy", "-.55em")
+                .attr("transform", "rotate(90)");
+
+//        svg.append("g")
+//                .attr("class", "y axis")
+//                .call(yAxis)
+//                .append("text")
+//                .attr("transform", "rotate(-90)")
+//                .attr("y", 6)
+//                .attr("dy", ".71em")
+//                .style("text-anchor", "end")
+//                .text("Value ($)");
+
+        svg.selectAll("bar")
+                .data(data)
+                .enter().append("rect")
+                .style("fill", "#aaa")
+                .attr("class", "bookbar")
+                .attr("id", function (d) {
+                    return "bar" + d.index;
+                })
+                .attr("index", function (d) {
+                    return d.index;
+                })
+                .attr("x", function (d) {
+                    return x(d.title);
+                })
+                .attr("width", x.rangeBand())
+                .attr("y", function (d) {
+                    return y(d.value);
+                })
+                .attr("height", function (d) {
+                    return height - y(d.value);
+                })
+                .on('mousedown', function () {
+                    bar_clicked(this)
+                })
+                .call(drag);
+
+
+        function get_random(){
+            //this needs to be re-weighted to reflect the number of notes in each book
+            curBook = Math.floor(Math.random()*data.length);//random from 0 to number of books
+            curQuote = Math.floor(Math.random()*data[curBook].notes.length); //random from 0 to number of quotes in that book
+            give_quote(curBook, curQuote);
+            change_bar(curBook);
+
+
+        }
+
+        get_random();
+        setInterval(function(){
+            get_random();
+        }, 10000);
+
+
+        function bar_clicked(index,evt) {
+            console.log(evt);
+            console.log(index);
+            var bookIndex = index.getAttribute('index');
+            svg.selectAll(".bookbar").style("fill", "#aaa");
+            index.style.fill = "skyblue";
+            curQuote = 0;
+            give_quote(bookIndex, 0);
+
+
+        }
+    }
+
+    function give_quote(bookIndex, quoteIndex) {
+
+        curBook = bookIndex;
+
+        var quote = $("#quote");
+        var quotetitle = $("#quotetitle");
+        var quoteauthor = $("#quoteauthor");
+        var quoteNumber = $("#quoteOutOf");
+
+        quote.finish();
+        quotetitle.finish();
+        quoteauthor.finish();
+        quoteNumber.finish();
+
+        quote.animate({
+                    opacity:0},
+                500,
+                function(){
+                    quote.text(data[bookIndex].notes[quoteIndex]);
+                    quote.animate({opacity:1},500);
+                });
+
+        quotetitle.animate({
+                    opacity:0},
+                500,
+                function(){
+                    quotetitle.text(data[bookIndex].title);
+                    quotetitle.animate({opacity:1},500);
+                });
+
+
+        quoteauthor.animate({
+                    opacity:0},
+                500,
+                function(){
+                    quoteauthor.text(data[bookIndex].author)
+                    quoteauthor.animate({opacity:1},500);
+                });
+
+        quoteNumber.animate({
+                    opacity:0},
+                500,
+                function(){
+                    var quoteOutOf = (curQuote + 1) + " of "+data[bookIndex].numHighlights;
+                    quoteNumber.text(quoteOutOf)
+                    quoteNumber.animate({opacity:1},500);
+                });
+    }
+    function drag_select(quoteIndex){
+        if(quoteIndex < 0){
+            quoteIndex = 0;
+        }
+        else if(quoteIndex >= data[curBook].numHighlights - 1){
+            quoteIndex = data[curBook].numHighlights - 1;
+        }
+        curQuote = quoteIndex;
+        bookIndex = curBook;
+
+        var quote = $("#quote");
+        var quotetitle = $("#quotetitle");
+        var quoteauthor = $("#quoteauthor");
+        var quoteNumber = $("#quoteOutOf");
+
+        quote.finish();
+        quotetitle.finish();
+        quoteauthor.finish();
+        quoteNumber.finish();
+
+        quote.text(data[bookIndex].notes[quoteIndex]);
+        quotetitle.text(data[bookIndex].title);
+        quoteauthor.text(data[bookIndex].author);
+        var quoteOutOf = (curQuote + 1) + " of "+data[bookIndex].numHighlights;
+        quoteNumber.text(quoteOutOf)
+
+//        quote.animate({
+//                    opacity:0},
+//                500,
+//                function(){
+//                    quote.text(data[bookIndex].notes[quoteIndex]);
+//                    quote.animate({opacity:1},500);
+//                });
+//
+//        quotetitle.animate({
+//                    opacity:0},
+//                500,
+//                function(){
+//                    quotetitle.text(data[bookIndex].title);
+//                    quotetitle.animate({opacity:1},500);
+//                });
+//
+//
+//        quoteauthor.animate({
+//                    opacity:0},
+//                500,
+//                function(){
+//                    quoteauthor.text(data[bookIndex].author);
+//                    quoteauthor.animate({opacity:1},500);
+//                });
+//
+//        quoteNumber.animate({
+//                    opacity:0},
+//                500,
+//                function(){
+//                    var quoteOutOf = (curQuote + 1) + " of "+data[bookIndex].numHighlights;
+//                    quoteNumber.text(quoteOutOf)
+//                    quoteNumber.animate({opacity:1},500);
+//                });
+    }
+
+    function changeQuote(direction){
+
+        curQuote += direction;
+        if(curQuote < 0){
+            curBook -= 1;
+//            console.log(data[curBook].numHighlights);
+            curQuote = data[curBook].numHighlights - 1;
+            change_bar(curBook);
+        }
+        else if(curQuote >= data[curBook].numHighlights){
+            curBook += 1;
+            curQuote = 0;
+            change_bar(curBook);
+        }
+        console.log(curQuote);
+        give_quote(curBook, curQuote);
+    }
+
+    function change_bar(bookIndex){
+        svg.selectAll(".bookbar").style("fill", "#aaa");
+        var selector = "bar"+bookIndex;
+        document.getElementById(selector).style.fill = "skyblue";
+    };
+
+
+</script>
+<div id="quotecontainer">
+<div id="quote">
+
+</div>
+    <div id="quotetitle">
+
+    </div>
+    <div id="quoteauthor">
+
+    </div>
+    <div id="quoteOutOf">
+
+    </div>
+    <div onclick="changeQuote(-1)">
+        Previous
+    </div>
+    <div onclick="changeQuote(1)">
+        Next
+    </div>
+</div>
+
+</body>
